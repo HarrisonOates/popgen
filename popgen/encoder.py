@@ -45,6 +45,9 @@ def encode_POP(pop, cmdargs):
 
     @proposition(E)
     class Action(Hashable):
+        def _prop_name(self):
+            return f"Action({self.name})"
+        #_prop_name = "Action"
         def __init__(self, name):
             self.name = name
 
@@ -59,6 +62,8 @@ def encode_POP(pop, cmdargs):
 
     @proposition(E)
     class Order(Hashable):
+        def _prop_name(self):
+            return f"Order({self.a1}, {self.a2})"
         def __init__(self, a1, a2):
             self.a1 = a1
             self.a2 = a2
@@ -71,6 +76,8 @@ def encode_POP(pop, cmdargs):
 
     @proposition(E)
     class Support(Hashable):
+        def _prop_name(self):
+            return f"Support({self.a1}, {self.p}, {self.a2})"
         def __init__(self, a1, p, a2):
             self.a1 = a1
             self.p = p
