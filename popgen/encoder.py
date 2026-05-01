@@ -4,7 +4,7 @@ import argparse, json
 from bauhaus import Encoding, proposition, And, Or
 from nnf import dimacs
 
-from lifter import lift_POP
+from .lifter import lift_POP
 
 
 class Hashable:
@@ -22,8 +22,9 @@ def encode_POP(pop, cmdargs):
     # For sanitization, make sure we close the pop
     pop.transativly_close()
 
-    F = pop.F
-    A = pop.A
+    # Sort F and A for deterministic iteration (both are sets in lifter)
+    F = sorted(pop.F, key=str)
+    A = sorted(pop.A, key=str)
 
     init = pop.init
     goal = pop.goal
@@ -46,19 +47,18 @@ def encode_POP(pop, cmdargs):
     @proposition(E)
     class Action(Hashable):
         def _prop_name(self):
-            return f"Action({self.name})"
-        #_prop_name = "Action"
-        def __init__(self, name):
-            self.name = name
+            return f"Action({self.action_obj})"
+        def __init__(self, action_obj):
+            self.action_obj = action_obj
 
         def __repr__(self):
-            return f"Action({self.name})"
+            return f"Action({self.action_obj})"
 
         def __str__(self):
-            return f"{self.name} in plan"
+            return f"{self.action_obj} in plan"
 
         def __hash__(self) -> int:
-            return hash(self.name)
+            return hash(self.action_obj)
 
     @proposition(E)
     class Order(Hashable):
@@ -93,8 +93,8 @@ def encode_POP(pop, cmdargs):
     orders = [Order(a1, a2) for a1 in A for a2 in A]
     supports = [Support(a1, p, a2) for a2 in A for p in a2.pres for a1 in adders[p]]
 
-    v2a = {action: action.name for action in actions}
-    a2v = {action.name: action for action in actions}
+    v2a = {action: action.action_obj for action in actions}
+    a2v = {action.action_obj: action for action in actions}
 
     v2o = {order: (order.a1, order.a2) for order in orders}
     o2v = {(order.a1, order.a2): order for order in orders}
@@ -131,20 +131,42 @@ def encode_POP(pop, cmdargs):
     # Satisfy all the preconditions
     for a2 in A:
         for p in a2.pres:
-            clauses.append(Action(a2) >> Or([Support(a1, p, a2) for a1 in [x for x in adders[p] if x is not a2]]))
+            clauses.append(Action(a2) >> Or([Support(a1, p, a2) for a1 in sorted([x for x in adders[p] if x is not a2], key=str)]))
 
     # Create unthreatened support
     for a2 in A:
         for p in a2.pres:
-            for a1 in [x for x in adders[p] if x is not a2]:
+            for a1 in sorted([x for x in adders[p] if x is not a2], key=str):
 
                 # Support implies ordering
                 clauses.append(Support(a1, p, a2) >> Order(a1, a2))
 
                 # Forbid threats
-                for ad in deleters[p]:
-                    if ad not in [a1, a2]:
-                        clauses.append(Support(a1, p, a2) >> (~Action(ad) | Order(ad, a1) | Order(a2, ad)))
+                if cmdargs.whiteknight:
+                    # White knight definition: allow threats if there's a white knight that re-establishes p
+                    # Key insight: the original producer a1 can serve as its own white knight (promotion)
+                    for ad in sorted(deleters[p], key=str):
+                        if ad not in [a1, a2]:
+                            # Promotion: ad < a1 < a2 (a1 acts as its own white knight)
+                            # Note: Order(a1, a2) is already enforced by Support(a1, p, a2) >> Order(a1, a2)
+                            promotion = Action(a1) & Order(ad, a1)
+
+                            # Other white knights: any other adder can re-establish p
+                            # Sort for deterministic iteration
+                            other_white_knights = [Action(aw) & Order(ad, aw) & Order(aw, a2)
+                                                  for aw in sorted(adders[p], key=str) if aw not in [a1, ad, a2]]
+
+                            if other_white_knights:
+                                # Demotion OR promotion OR other white knights
+                                clauses.append(Support(a1, p, a2) >> (~Action(ad) | Order(a2, ad) | promotion | Or(other_white_knights)))
+                            else:
+                                # No other white knights, only demotion and promotion
+                                clauses.append(Support(a1, p, a2) >> (~Action(ad) | Order(a2, ad) | promotion))
+                else:
+                    # Standard definition: forbid all threats
+                    for ad in sorted(deleters[p], key=str):
+                        if ad not in [a1, a2]:
+                            clauses.append(Support(a1, p, a2) >> (~Action(ad) | Order(ad, a1) | Order(a2, ad)))
 
 
     if cmdargs.serial:
@@ -218,6 +240,7 @@ if __name__ == '__main__':
     parser.add_argument('--allact', dest='allact', action='store_true', help='Include all actions in the plan')
     parser.add_argument('--serial', dest='serial', action='store_true', help='Force it to be serial')
     parser.add_argument('--deorder', dest='deorder', action='store_true', help='Force it to be a deordering')
+    parser.add_argument('--white-knight', dest='whiteknight', action='store_true', help='Use white knight causal threat definition')
 
     args = parser.parse_args()
     pop = lift_POP(args.domain, args.problem, args.plan, serialized=True)

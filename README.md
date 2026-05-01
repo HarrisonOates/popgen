@@ -1,14 +1,14 @@
 # POPGEN
 
-Methods for deordering and reordering partial order plans.
-
-## Disclaimer
-
-This code is from half-a-decade ago, and is in need of some serious updating. This will likely come in the form of a rewrite using libraries such as [[bauhaus](https://github.com/qumulab/bauhaus)], but until that time please be aware that things may no longer be working with modern libraries.
+Methods for deordering and reordering partial order causal link (POCL) plans.
 
 ## Usage
 
 ```bash
+# Assuming you have uv already installed
+$ uv venv
+$ uv sync
+
 # Encode a given problem+plan into a MaxSAT instance
 $ python popgen/encoder.py --domain d.pddl --problem p.pddl --plan p.plan --output out.wcnf
 
@@ -33,5 +33,16 @@ $ python popgen/analyzer.py --map out.wcnf.map --rc2out out.sol --print-solution
   journal   = {Journal of Artificial Intelligence Research},
   year      = {2016},
   url       = {http://www.jair.org/media/5128/live-5128-9534-jair.pdf}
+}
+```
+
+This repository extends POPGEN with support for general partial-order plans via white knight constraints. If you use this functionality, please additionally cite:
+```latex
+@InProceedings{Oates2026WhiteKnights,
+  author    = {Harrison Oates and Pascal Bercher},
+  booktitle = {IJCAI-ECAI 2026},
+  title     = {Are White Knights Worth the Trouble? Reconciling POCL and Partial-Order Plans for Plan Optimization},
+  year      = {2026},
+  publisher = {IJCAI Organization}
 }
 ```

@@ -7,11 +7,11 @@
 import argparse
 import networkx as nx
 
-import tarskilite as tl
+from . import tarskilite as tl
 
 
-from pop import POP
-from linearizer import count_linearizations
+from .pop import POP
+from .linearizer import count_linearizations
 
 
 def make_layered_POP(layered_plan, domain = 'domain.pddl', problem = 'prob.pddl', popfout = 'POPF.out'):
@@ -92,7 +92,7 @@ def lift_POP(domain, problem, pfile, serialized = False):
 
     prob = tl.STRIPS(domain, problem)
     allF = prob.fluents
-    allA = {str(a): a for a in prob.actions}
+    allA = {str(a).lower(): a for a in prob.actions}
     I = prob.init
     G = prob.goal
 
@@ -106,7 +106,6 @@ def lift_POP(domain, problem, pfile, serialized = False):
     F = set()
     A = set()
     action_names = set()
-    a_index = 1
 
     indices = {None: 99999} # Should be larger than any plan we need to deal with
     reverse_indices = {}
@@ -121,15 +120,11 @@ def lift_POP(domain, problem, pfile, serialized = False):
     reverse_indices[0] = init
 
     # Normal actions
-    for act in plan:
-        orig_act = allA[act[1:-1]]
-        a = tl.Action(orig_act.name, orig_act.pres, orig_act.adds, orig_act.dels)
+    for line_num, act in enumerate(plan, start=1):
+        orig_act = allA[act[1:-1].lower()]
+        a = tl.Action(orig_act.name, orig_act.pres, orig_act.adds, orig_act.dels, instance_id=line_num)
         pop.add_action(a)
         F |= a.adds | a.pres | a.dels
-
-        if act in action_names:
-            a.name = a.name + ("-%d" % a_index)
-            a_index += 1
 
         assert a not in A
 
@@ -160,7 +155,7 @@ def lift_POP(domain, problem, pfile, serialized = False):
     # If a serialized plan was called for, make sure the actions are in their original order
     if serialized:
         for i in range(index):
-            pop.link_actions(reverse_indices[i], reverse_indices[i+1], "serial")
+            pop.link_actions(reverse_indices[i], "serial", reverse_indices[i+1])
         return pop
 
     adders = {}

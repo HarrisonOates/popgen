@@ -75,12 +75,12 @@ class POP(object):
 
     def transativly_close(self):
         all_pairs = dict(nx.all_pairs_shortest_path_length(self.network))
-        for a1 in self.network.nodes():
-            for a2 in self.network.nodes():
+        for a1 in list(self.network.nodes()):
+            for a2 in list(self.network.nodes()):
                 if a1 != a2:
                     if not self.network.has_edge(a1, a2):
                         if a2 in set(all_pairs[a1].keys()):
-                            self.link_actions(a1, a2, 'trans')
+                            self.link_actions(a1, 'trans', a2)
 
     def compute_causal_links(self):
         all_pairs = dict(nx.all_pairs_shortest_path_length(self.network))
